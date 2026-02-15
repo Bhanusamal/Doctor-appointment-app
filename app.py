@@ -1,19 +1,26 @@
 import pymysql
 from flask import Flask, request, jsonify, send_from_directory
 import os
+import traceback
 from config import Config
 
 app = Flask(__name__, static_folder='static')
 app.config.from_object(Config)
 
 def get_db():
-    return pymysql.connect(
-        host=app.config['MYSQL_HOST'],
-        user=app.config['MYSQL_USER'],
-        password=app.config['MYSQL_PASSWORD'],
-        database=app.config['MYSQL_DB'],
-        cursorclass=pymysql.cursors.DictCursor
-    )
+    try:
+        conn = pymysql.connect(
+            host=app.config['MYSQL_HOST'],
+            user=app.config['MYSQL_USER'],
+            password=app.config['MYSQL_PASSWORD'],
+            database=app.config['MYSQL_DB'],
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        print(traceback.format_exc())
+        raise
 
 @app.route('/')
 def index():
@@ -29,7 +36,9 @@ def doctors():
         conn.close()
         return jsonify(doctors=rows)
     except Exception as e:
-        return jsonify({'error': 'Server error'}), 500
+        print(f"Error in doctors(): {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/api/doctors', methods=['POST'])
 def add_doctor():
@@ -47,7 +56,9 @@ def add_doctor():
         conn.close()
         return jsonify({'success': True, 'id': doc_id})
     except Exception as e:
-        return jsonify({'error': 'Server error'}), 500
+        print(f"Error in doctors(): {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/api/slots/<int:doctor_id>')
 def slots(doctor_id):
@@ -68,7 +79,9 @@ def slots(doctor_id):
         available = [s for s in all_slots if s not in booked]
         return jsonify(slots=available)
     except Exception as e:
-        return jsonify({'error': 'Server error'}), 500
+        print(f"Error in doctors(): {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/api/appointments', methods=['GET'])
 def list_appointments():
@@ -93,7 +106,9 @@ def list_appointments():
                 r['appointment_date'] = str(r['appointment_date'])
         return jsonify(appointments=rows)
     except Exception as e:
-        return jsonify({'error': 'Server error'}), 500
+        print(f"Error in doctors(): {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/api/appointments', methods=['POST'])
 def create_appointment():
@@ -123,7 +138,9 @@ def create_appointment():
         conn.close()
         return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'error': 'Server error'}), 500
+        print(f"Error in doctors(): {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/api/appointments/<int:aid>', methods=['DELETE'])
 def cancel_appointment(aid):
@@ -141,7 +158,35 @@ def cancel_appointment(aid):
         conn.close()
         return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'error': 'Server error'}), 500
+        print(f"Error in doctors(): {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 if __name__ == '__main__':
+    print("=" * 50)
+    print("Starting Doctor Booking App...")
+    print(f"MySQL Host: {app.config['MYSQL_HOST']}")
+    print(f"MySQL User: {app.config['MYSQL_USER']}")
+    print(f"MySQL Database: {app.config['MYSQL_DB']}")
+    print("=" * 50)
+    print("Testing database connection...")
+    try:
+        conn = get_db()
+        print("✓ Database connection successful!")
+        conn.close()
+    except Exception as e:
+        print(f"✗ Database connection failed: {e}")
+        print("\nPlease check:")
+        print("1. MySQL is running")
+        print("2. Database 'doctor_booking' exists (run: python init_db.py)")
+        print("3. MySQL credentials are correct")
+        print(f"   Current: host={app.config['MYSQL_HOST']}, user={app.config['MYSQL_USER']}, db={app.config['MYSQL_DB']}")
+        print("\nYou can set environment variables:")
+        print("  set MYSQL_HOST=localhost")
+        print("  set MYSQL_USER=root")
+        print("  set MYSQL_PASSWORD=your_password")
+        print("  set MYSQL_DB=doctor_booking")
+    print("=" * 50)
+    print("Starting Flask server on http://127.0.0.1:5000")
+    print("=" * 50)
     app.run(debug=True, port=5000)
