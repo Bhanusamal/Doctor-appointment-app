@@ -5,10 +5,10 @@ Set MYSQL_USER, MYSQL_PASSWORD, MYSQL_HOST as needed.
 import pymysql
 import os
 
-host = os.environ.get('MYSQL_HOST', 'localhost')
-user = os.environ.get('MYSQL_USER', 'root')
-password = os.environ.get('MYSQL_PASSWORD', '')
-db_name = os.environ.get('MYSQL_DB', 'doctor_booking')
+host = os.environ.get('', 'localhost')
+user = os.environ.get('', 'root')
+password = os.environ.get('', '')
+db_name = os.environ.get('', 'doctor_booking')
 
 conn = pymysql.connect(host=host, user=user, password=password)
 with conn.cursor() as cur:
