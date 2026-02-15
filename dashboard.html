@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Appointment – Doctor Booking</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <main class="dash">
+    <div class="section">
+      <h2>Add doctor</h2>
+      <div class="card">
+        <input type="text" id="doctorName" placeholder="Doctor name">
+        <input type="text" id="doctorSpec" placeholder="Specialization (optional)">
+        <p id="addDoctorError" class="error hide"></p>
+        <button type="button" id="addDoctorBtn">Add doctor</button>
+      </div>
+    </div>
+    <div class="section">
+      <h2>Book appointment</h2>
+      <div class="card">
+        <label>Your name</label>
+        <input type="text" id="patientName" placeholder="Full name">
+        <label>Your email</label>
+        <input type="email" id="patientEmail" placeholder="Email">
+        <label>Doctor</label>
+        <select id="doctorSelect">
+          <option value="">Select doctor</option>
+        </select>
+        <label>Date</label>
+        <input type="date" id="apptDate">
+        <label>Time</label>
+        <div id="slotContainer" class="slot-grid"></div>
+        <p id="bookError" class="error hide"></p>
+        <button type="button" id="bookBtn">Book</button>
+      </div>
+    </div>
+    <div class="section">
+      <h2>View my bookings</h2>
+      <div class="card">
+        <input type="email" id="viewEmail" placeholder="Enter your email">
+        <button type="button" id="viewBtn">Show appointments</button>
+      </div>
+      <ul id="apptList" class="appt-list"></ul>
+    </div>
+  </main>
+  <script src="/static/app.js"></script>
+  <script>
+    (async function() {
+      const doctorSelect = document.getElementById('doctorSelect');
+      const apptDate = document.getElementById('apptDate');
+      const slotContainer = document.getElementById('slotContainer');
+      const bookBtn = document.getElementById('bookBtn');
+      const bookError = document.getElementById('bookError');
+      const patientName = document.getElementById('patientName');
+      const patientEmail = document.getElementById('patientEmail');
+      const viewEmail = document.getElementById('viewEmail');
+      const viewBtn = document.getElementById('viewBtn');
+      const apptList = document.getElementById('apptList');
+      const doctorName = document.getElementById('doctorName');
+      const doctorSpec = document.getElementById('doctorSpec');
+      const addDoctorBtn = document.getElementById('addDoctorBtn');
+      const addDoctorError = document.getElementById('addDoctorError');
+
+      const loadDoctors = async () => {
+        const res = await fetch('/api/doctors');
+        const data = await res.json();
+        doctorSelect.innerHTML = '<option value="">Select doctor</option>';
+        (data.doctors || []).forEach(d => {
+          const o = document.createElement('option');
+          o.value = d.id;
+          o.textContent = `${d.name} – ${d.specialization}`;
+          doctorSelect.appendChild(o);
+        });
+      };
+      await loadDoctors();
+
+      addDoctorBtn.onclick = async () => {
+        const name = doctorName.value.trim();
+        const spec = doctorSpec.value.trim();
+        addDoctorError.classList.add('hide');
+        if (!name) { addDoctorError.textContent = 'Enter doctor name'; addDoctorError.classList.remove('hide'); return; }
+        const res = await fetch('/api/doctors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, specialization: spec || 'General' }) });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) { doctorName.value = ''; doctorSpec.value = ''; loadDoctors(); } else { addDoctorError.textContent = data.error || 'Failed to add doctor'; addDoctorError.classList.remove('hide'); }
+      };
+
+      const loadSlots = async () => {
+        const did = doctorSelect.value;
+        const date = apptDate.value;
+        slotContainer.innerHTML = '';
+        if (!did || !date) return;
+        const res = await fetch(`/api/slots/${did}?date=${encodeURIComponent(date)}`);
+        const data = await res.json();
+        (data.slots || []).forEach(slot => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'slot-btn';
+          btn.textContent = slot;
+          btn.onclick = () => {
+            document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            btn.dataset.slot = slot;
+          };
+          slotContainer.appendChild(btn);
+        });
+      };
+      doctorSelect.addEventListener('change', loadSlots);
+      apptDate.addEventListener('change', loadSlots);
+
+      const loadAppointments = async (email) => {
+        if (!email) { apptList.innerHTML = ''; return; }
+        const res = await fetch(`/api/appointments?email=${encodeURIComponent(email)}`);
+        const data = await res.json();
+        apptList.innerHTML = '';
+        (data.appointments || []).filter(a => a.status === 'confirmed').forEach(a => {
+          const li = document.createElement('li');
+          li.innerHTML = `<span>${a.doctor_name} – ${a.appointment_date} ${a.time_slot}</span>`;
+          const cancel = document.createElement('button');
+          cancel.className = 'cancel danger secondary';
+          cancel.textContent = 'Cancel';
+          cancel.onclick = async () => {
+            if (!confirm('Cancel this appointment?')) return;
+            const delRes = await fetch(`/api/appointments/${a.id}?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+            const d = await delRes.json().catch(() => ({}));
+            if (delRes.ok) loadAppointments(email);
+            else alert(d.error || 'Could not cancel');
+          };
+          li.appendChild(cancel);
+          apptList.appendChild(li);
+        });
+      };
+
+      viewBtn.onclick = () => loadAppointments(viewEmail.value.trim());
+
+      bookBtn.onclick = async () => {
+        const name = patientName.value.trim();
+        const email = patientEmail.value.trim();
+        const doctorId = doctorSelect.value;
+        const date = apptDate.value;
+        const selected = slotContainer.querySelector('.slot-btn.selected');
+        const time_slot = selected ? selected.dataset.slot : '';
+        bookError.classList.add('hide');
+        if (!name || !email) { bookError.textContent = 'Enter your name and email'; bookError.classList.remove('hide'); return; }
+        if (!doctorId || !date || !time_slot) { bookError.textContent = 'Select doctor, date and time'; bookError.classList.remove('hide'); return; }
+        const res = await fetch('/api/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ doctor_id: parseInt(doctorId), date, time_slot, patient_name: name, patient_email: email })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          slotContainer.querySelector('.slot-btn.selected')?.classList.remove('selected');
+          viewEmail.value = email;
+          loadAppointments(email);
+        } else {
+          bookError.textContent = data.error || 'Booking failed';
+          bookError.classList.remove('hide');
+        }
+      };
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login – Doctor Booking</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Doctor Booking</h1>
+      <div id="loginForm">
+        <input type="email" id="email" placeholder="Email" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <p id="loginError" class="error hide"></p>
+        <button type="button" id="loginBtn">Log in</button>
+        <div class="links"><a href="#" id="showRegister">Create account</a></div>
+      </div>
+      <div id="registerForm" class="hide">
+        <input type="text" id="regName" placeholder="Full name" required>
+        <input type="email" id="regEmail" placeholder="Email" required>
+        <input type="password" id="regPassword" placeholder="Password (min 6)" required>
+        <p id="regError" class="error hide"></p>
+        <button type="button" id="registerBtn">Register</button>
+        <div class="links"><a href="#" id="showLogin">Back to login</a></div>
+      </div>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+  <script>
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const showRegister = document.getElementById('showRegister');
+    const showLogin = document.getElementById('showLogin');
+    showRegister.onclick = (e) => { e.preventDefault(); loginForm.classList.add('hide'); registerForm.classList.remove('hide'); };
+    showLogin.onclick = (e) => { e.preventDefault(); registerForm.classList.add('hide'); loginForm.classList.remove('hide'); };
+
+    document.getElementById('loginBtn').onclick = async () => {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const errEl = document.getElementById('loginError');
+      errEl.classList.add('hide');
+      if (!email || !password) { errEl.textContent = 'Email and password required'; errEl.classList.remove('hide'); return; }
+      const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) window.location.href = '/';
+      else { errEl.textContent = data.error || 'Login failed'; errEl.classList.remove('hide'); }
+    };
+
+    document.getElementById('registerBtn').onclick = async () => {
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const password = document.getElementById('regPassword').value;
+      const errEl = document.getElementById('regError');
+      errEl.classList.add('hide');
+      if (!name || !email || !password) { errEl.textContent = 'Name, email and password required'; errEl.classList.remove('hide'); return; }
+      const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password }) });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) { errEl.textContent = 'Account created. Please log in.'; errEl.style.color = 'green'; errEl.classList.remove('hide'); registerForm.classList.add('hide'); loginForm.classList.remove('hide'); }
+      else { errEl.textContent = data.error || 'Registration failed'; errEl.classList.remove('hide'); }
+    };
+  </script>
+</body>
+</html>
